@@ -133,7 +133,7 @@ public class MainPrebot extends NarwhalRobot {
 
         dcu.initNarwhalDashboard();
 
-        int timeMs = 4000;
+        int timeMs = 2000;
 
         NarwhalDashboard.addButton("g_10_08", (boolean down) -> {
             if (down) {
