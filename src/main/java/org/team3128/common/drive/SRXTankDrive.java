@@ -129,8 +129,10 @@ public class SRXTankDrive implements ITankDrive {
 	 * Motion Magic/Motion Profile control mode as well as velocity
 	 * control mode.
 	 */
-	private PIDConstants leftMotionProfilePID, leftVelocityPID;
-	private PIDConstants rightMotionProfilePID, rightVelocityPID;
+	public PIDConstants leftMotionProfilePID;
+	// private PIDConstants leftVelocityPID, rightVelocityPID;
+
+	public PIDConstants rightMotionProfilePID;
 
 	// public double getGearRatio()
 	// {
@@ -199,9 +201,6 @@ public class SRXTankDrive implements ITankDrive {
 		configureDriveMode(DriveMode.TELEOP);
 
 		loadSRXPIDConstants();
-		setupDashboardPIDListener();
-
-		sendPIDConstants();
 
 		// if (gearRatio <= 0)
 		// {
@@ -394,109 +393,41 @@ public class SRXTankDrive implements ITankDrive {
 		leftMotionProfilePID = new PIDConstants(configs.kF, configs.kP, configs.kI, configs.kD);
 		Log.info("SRXTankDrive", "Left MP: " + leftMotionProfilePID);
 
-		leftMotors.getSlotConfigs(configs, 1, Constants.CAN_TIMEOUT);
-		leftVelocityPID = new PIDConstants(configs.kF, configs.kP, configs.kI, configs.kD);
-		Log.info("SRXTankDrive", "Left V: " + leftVelocityPID);
+		// leftMotors.getSlotConfigs(configs, 1, Constants.CAN_TIMEOUT);
+		// leftVelocityPID = new PIDConstants(configs.kF, configs.kP, configs.kI, configs.kD);
+		// Log.info("SRXTankDrive", "Left V: " + leftVelocityPID);
 
 		rightMotors.getSlotConfigs(configs, 0, Constants.CAN_TIMEOUT);
 		rightMotionProfilePID = new PIDConstants(configs.kF, configs.kP, configs.kI, configs.kD);
 		Log.info("SRXTankDrive", "Right MP: " + rightMotionProfilePID);
 
-		rightMotors.getSlotConfigs(configs, 1, Constants.CAN_TIMEOUT);
-		rightVelocityPID = new PIDConstants(configs.kF, configs.kP, configs.kI, configs.kD);
-		Log.info("SRXTankDrive", "Right V: " + rightVelocityPID);
+		// rightMotors.getSlotConfigs(configs, 1, Constants.CAN_TIMEOUT);
+		// rightVelocityPID = new PIDConstants(configs.kF, configs.kP, configs.kI, configs.kD);
+		// Log.info("SRXTankDrive", "Right V: " + rightVelocityPID);
 	}
 
-	public void setLeftPID() {
-		Log.info("SRXTankDrive", "Setting left PID constants.");
+	public void setPID() {
+		Log.info("SRXTankDrive", "Setting PID constants.");
 
-		leftMotors.config_kF(0, leftMotionProfilePID.kF);
+		//leftMotors.config_kF(0, leftMotionProfilePID.kF);
 		leftMotors.config_kP(0, leftMotionProfilePID.kP);
 		leftMotors.config_kI(0, leftMotionProfilePID.kI);
 		leftMotors.config_kD(0, leftMotionProfilePID.kD);
 
-		leftMotors.config_kF(1, leftVelocityPID.kF);
-		leftMotors.config_kP(1, leftVelocityPID.kP);
-		leftMotors.config_kI(1, leftVelocityPID.kI);
-		leftMotors.config_kD(1, leftVelocityPID.kD);
-
-		sendPIDConstants();
-	}
-
-	public void setRightPID() {
-		Log.info("SRXTankDrive", "Setting right PID constants.");
-
-		rightMotors.config_kF(0, rightMotionProfilePID.kF);
+		//rightMotors.config_kF(0, rightMotionProfilePID.kF);
 		rightMotors.config_kP(0, rightMotionProfilePID.kP);
 		rightMotors.config_kI(0, rightMotionProfilePID.kI);
 		rightMotors.config_kD(0, rightMotionProfilePID.kD);
 
-		rightMotors.config_kF(1, rightVelocityPID.kF);
-		rightMotors.config_kP(1, rightVelocityPID.kP);
-		rightMotors.config_kI(1, rightVelocityPID.kI);
-		rightMotors.config_kD(1, rightVelocityPID.kD);
+		// leftMotors.config_kF(1, leftVelocityPID.kF);
+		// leftMotors.config_kP(1, leftVelocityPID.kP);
+		// leftMotors.config_kI(1, leftVelocityPID.kI);
+		// leftMotors.config_kD(1, leftVelocityPID.kD);
 
-		sendPIDConstants();
-	}
-
-	/**
-	 * Sets up listeners to update drive PID constants when sent from
-	 * NarwhalDashboard
-	 */
-	public void setupDashboardPIDListener() {
-		NarwhalDashboard.addNumDataListener("leftPID", (double constants[]) -> {
-			this.leftMotionProfilePID.kF = constants[0];
-			this.leftMotionProfilePID.kP = constants[1];
-			this.leftMotionProfilePID.kI = constants[2];
-			this.leftMotionProfilePID.kD = constants[3];
-
-			this.leftVelocityPID.kF = constants[0];
-			this.leftVelocityPID.kP = constants[4];
-			this.leftVelocityPID.kI = constants[5];
-			this.leftVelocityPID.kD = constants[6];
-
-			this.setLeftPID();
-		});
-
-		NarwhalDashboard.addNumDataListener("rightPID", (double constants[]) -> {
-			this.rightMotionProfilePID.kF = constants[0];
-			this.rightMotionProfilePID.kP = constants[1];
-			this.rightMotionProfilePID.kI = constants[2];
-			this.rightMotionProfilePID.kD = constants[3];
-
-			this.rightVelocityPID.kF = constants[0];
-			this.rightVelocityPID.kP = constants[4];
-			this.rightVelocityPID.kI = constants[5];
-			this.rightVelocityPID.kD = constants[6];
-
-			this.setRightPID();
-		});
-	}
-
-	/**
-	 * Sends PID constants to NarwhalDashboard
-	 */
-	public void sendPIDConstants() {
-		NarwhalDashboard.put("l_f", leftMotionProfilePID.kF);
-
-		NarwhalDashboard.put("l_mp_p", leftMotionProfilePID.kP);
-		NarwhalDashboard.put("l_mp_i", leftMotionProfilePID.kI);
-		NarwhalDashboard.put("l_mp_d", leftMotionProfilePID.kD);
-
-		NarwhalDashboard.put("l_v_p", leftVelocityPID.kP);
-		NarwhalDashboard.put("l_v_i", leftVelocityPID.kI);
-		NarwhalDashboard.put("l_v_d", leftVelocityPID.kD);
-
-
-		NarwhalDashboard.put("r_f", rightMotionProfilePID.kF);
-
-		NarwhalDashboard.put("r_mp_p", rightMotionProfilePID.kP);
-		NarwhalDashboard.put("r_mp_i", rightMotionProfilePID.kI);
-		NarwhalDashboard.put("r_mp_d", rightMotionProfilePID.kD);
-
-		NarwhalDashboard.put("r_v_p", leftVelocityPID.kP);
-		NarwhalDashboard.put("r_v_i", leftVelocityPID.kI);
-		NarwhalDashboard.put("r_v_d", leftVelocityPID.kD);
+		// rightMotors.config_kF(1, rightVelocityPID.kF);
+		// rightMotors.config_kP(1, rightVelocityPID.kP);
+		// rightMotors.config_kI(1, rightVelocityPID.kI);
+		// rightMotors.config_kD(1, rightVelocityPID.kD);
 	}
 
 	/**
@@ -528,9 +459,15 @@ public class SRXTankDrive implements ITankDrive {
 	 *
 	 */
 	public enum MoveEndMode {
-		BOTH, // ends when both sides have reached their targets.
-		EITHER, // Stops both sides when either side has reached its target.
-				// Force stops the move command of the slower side.
+		/**
+		 * Ends the move command when both sides have reached their targets.
+		 */
+		BOTH,
+		/**
+		 * Stops both sides when either side has reached its target, force stopping
+		 * the move command of the slower side.
+		 */ 
+		EITHER,
 	}
 
 	/**
@@ -1024,7 +961,7 @@ public class SRXTankDrive implements ITankDrive {
 	}
 
 	/**
-	  * Callibration command to determine effective wheelbase of the robot. This is
+	  * Calibration command to determine effective wheelbase of the robot. This is
 	  * to account for the field material scrubbing against the wheels, resisting a
 	  * turning motion.
 	  *
@@ -1116,26 +1053,19 @@ public class SRXTankDrive implements ITankDrive {
 	}
 
 	public static class FeedForwardPowerMultiplierSet {
-		public int numLoops;
 		private List<FeedForwardPowerMultiplier> ffpms = new ArrayList<FeedForwardPowerMultiplier>();
-		private List<FeedForwardPowerMultiplier> ffpmsAvg = new ArrayList<FeedForwardPowerMultiplier>();
+		public FeedForwardPowerMultiplier ffpmAvg;
 
 		public void addFeedForwardPowerMultiplier(double angularVelocity, double ffpL, double ffpR) {
 			ffpms.add(new FeedForwardPowerMultiplier(angularVelocity, ffpL, ffpR));
 		}
-		public void addFeedForwardPowerMultiplierAvg(double angularVelocity, double ffpL, double ffpR) {
-			ffpmsAvg.add(new FeedForwardPowerMultiplier(angularVelocity, ffpL, ffpR));
+
+		public void setAverage(double angularVelocity, double ffpL, double ffpR) {
+			ffpmAvg = new FeedForwardPowerMultiplier(angularVelocity, ffpL, ffpR);
 		}
-		public void removeLastAverage(){
-			ffpmsAvg.remove(ffpmsAvg.size() - 1);
-		}
-		public void removeLastAll(){
-			for(int i = 0; i < numLoops; i++){
-				ffpms.remove(ffpmsAvg.size() - 1);
-			}
-		}
+
 		public String getAllCSV() {
-			String csv = "angular velocity, ffpL, ffpR\n";
+			String csv = "";
 
 			for (FeedForwardPowerMultiplier ffpm : ffpms) {
 				csv += ffpm.angularVelocity + ",";
@@ -1146,19 +1076,19 @@ public class SRXTankDrive implements ITankDrive {
 			return csv;
 		}
 		public String getAvgCSV() {
-			String csv = "angular velocity, ffpL, ffpR\n";
+			String csv = "";
 
-			for (FeedForwardPowerMultiplier ffpmAvg : ffpms) {
-				csv += ffpmAvg.angularVelocity + ",";
-				csv += ffpmAvg.ffpL + ",";
-				csv += ffpmAvg.ffpR + "\n";
-			}
+			csv += ffpmAvg.angularVelocity + ",";
+			csv += ffpmAvg.ffpL + ",";
+			csv += ffpmAvg.ffpR + "\n";
 
 			return csv;
 		}
     }
 
 	public class CmdGetFeedForwardPowerMultiplier extends Command {
+		private final double VELOCITY_PLATEAU_RANGE = 2;
+
 		double leftPower, rightPower;
 
 		double voltage;
@@ -1167,14 +1097,14 @@ public class SRXTankDrive implements ITankDrive {
 		double targetAngularVelocity;
 
 		double vL, vR;
-		double ffpLSum, ffpRSum;
+		double ffpmLSum, ffpmRSum;
 		
-		double ffpL, ffpR;
+		double ffpmL, ffpmR;
 
 		Gyro gyro;
 
-		int timesRun;
-		int loopNum;
+		int inRangeCount;
+		int executeCount;
 
 		FeedForwardPowerMultiplierSet feedForwardPowerMultiplierSet;
 
@@ -1194,14 +1124,46 @@ public class SRXTankDrive implements ITankDrive {
 			voltage = RobotController.getBatteryVoltage();
 			tankDrive(leftPower, rightPower);
 
-			try {
-				Thread.sleep(1500);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+			double currentAngularVelocity = 0;
+			double previousAngularVelocity = 0;
+			int plateauCount = 0;
+
+			while (true) {
+				currentAngularVelocity = gyro.getRate();
+				Log.info("CmdGetFeedForwardPowerMultiplier", "Plateau Velocity: " + currentAngularVelocity);
+
+				if (Math.abs(gyro.getRate() - previousAngularVelocity) < VELOCITY_PLATEAU_RANGE) {
+					plateauCount += 1;
+				}
+				else {
+					plateauCount = 0;
+				}
+
+				if (plateauCount > 10) break;
+				previousAngularVelocity = currentAngularVelocity;
+
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 
-			targetAngularVelocity = gyro.getRate();
-			Log.info("targetW", String.valueOf(targetAngularVelocity));
+			double angularVelocitySum = 0;
+			int angularVelocityCount = 0;
+
+			double rate;
+
+			for (int i = 0; i < 25; i++) {
+				rate = gyro.getRate();
+
+				angularVelocitySum += rate;
+				angularVelocityCount += 1;
+
+				// Log.info("CmdGetFeedForwardPowerMultiplier", "" + rate);
+			}
+			
+			targetAngularVelocity = angularVelocitySum / angularVelocityCount;
 		}
 
 		@Override
@@ -1212,20 +1174,28 @@ public class SRXTankDrive implements ITankDrive {
 				e.printStackTrace();
 			}
 
+			executeCount += 1;
+
 			vL = getLeftMotors().getSelectedSensorVelocity() * 10/4096 * wheelCircumfrence;
 			vR = getRightMotors().getSelectedSensorVelocity() * 10/4096 * wheelCircumfrence;
 
 			angularVelocity = gyro.getRate();
-			Log.info("currentAngularW", String.valueOf(angularVelocity));
-			loopNum++;
-			ffpL = leftPower/(vL * voltage/12.0);
-			ffpR = rightPower/(vR * voltage/12.0);
-			feedForwardPowerMultiplierSet.addFeedForwardPowerMultiplier(angularVelocity, ffpL, ffpR);
+			Log.info("CmdGetFeedForwardPowerMultiplier", "Loop omega = " + angularVelocity);
+
+			ffpmL = leftPower/(vL * voltage/12.0);
+			ffpmR = rightPower/(vR * voltage/12.0);
+
+			if (RobotMath.isWithin(angularVelocity, targetAngularVelocity, 25.0)) {
+				feedForwardPowerMultiplierSet.addFeedForwardPowerMultiplier(angularVelocity, ffpmL, ffpmR);
+			}
+
 			if (RobotMath.isWithin(angularVelocity, targetAngularVelocity, 10.0)) {
 				angularVelocitySum += angularVelocity;
-				ffpLSum += ffpL;
-				ffpRSum += ffpR;
-				timesRun++;
+
+				ffpmLSum += ffpmL;
+				ffpmRSum += ffpmR;
+
+				inRangeCount += 1;
 			}
 		}
 
@@ -1237,14 +1207,24 @@ public class SRXTankDrive implements ITankDrive {
 		@Override
 		protected void end() {
 			stopMovement();
-			Log.info("angVelSum", String.valueOf(angularVelocitySum));
-			Log.info("ffpLSum", String.valueOf(ffpLSum));
-			Log.info("ffpRSum", String.valueOf(ffpRSum));
-			feedForwardPowerMultiplierSet.addFeedForwardPowerMultiplierAvg(angularVelocitySum/timesRun, ffpLSum/timesRun, ffpRSum/timesRun);
-			feedForwardPowerMultiplierSet.numLoops = timesRun;
-			Log.info("# of loops", String.valueOf(loopNum));
-			Log.info("# of valid loops", String.valueOf(timesRun))
 
-;		}
+			double avgAngularVelocity = angularVelocitySum / inRangeCount;
+			double ffpmLAvg = ffpmLSum / inRangeCount;
+			double ffpmRAvg = ffpmRSum / inRangeCount;
+
+			Log.info("CmdGetFeedForwardPowerMultiplier",
+				"Completed...\n" +
+				"\tTarget Angular Velocity: " + targetAngularVelocity + "\n" +
+				"\tRuntime Information:\n" +
+				"\t\tTotal Loops: " + executeCount + "\n" +
+				"\t\tIn-Range Loops: " + inRangeCount + "\n" +
+				"\tFinal Average Values\n" +
+				"\t\tAngular Velocity: " + avgAngularVelocity + "\n" +
+				"\t\tLeft FFPM: " + ffpmLAvg + "\n" +
+				"\t\tRight FFPM: " + ffpmRAvg
+			);
+
+			feedForwardPowerMultiplierSet.setAverage(angularVelocitySum/inRangeCount, ffpmLSum/inRangeCount, ffpmRSum/inRangeCount);
+		}
  	}
 }

@@ -1,4 +1,4 @@
-package org.team3128.common.drive.callibrationutility;
+package org.team3128.common.drive.calibrationutility;
 
 import org.team3128.common.drive.SRXTankDrive;
 import org.team3128.common.drive.SRXTankDrive.Wheelbase;
@@ -8,19 +8,19 @@ import org.team3128.common.util.Log;
 import org.team3128.common.drive.SRXTankDrive.FeedForwardPowerMultiplierSet;
 import org.team3128.common.util.units.Length;
 
-public class DriveCallibrationUtility {
-    private static DriveCallibrationUtility instance = null;
-	public static DriveCallibrationUtility getInstance() {
+public class DriveCalibrationUtility {
+    private static DriveCalibrationUtility instance = null;
+	public static DriveCalibrationUtility getInstance() {
 		if (instance != null) {
 			return instance;
 		}
 
-		Log.fatal("DriveCallibrationUtility", "Attempted to get instance before initializtion! Call initialize(...) first.");
+		Log.fatal("DriveCalibrationUtility", "Attempted to get instance before initializtion! Call initialize(...) first.");
 		return null;
     }
     
-    public static void initialize(Gyro gyro, FeedForwardPowerMultiplierSet wrapper) {
-        instance = new DriveCallibrationUtility(gyro, wrapper);
+    public static void initialize(Gyro gyro) {
+        instance = new DriveCalibrationUtility(gyro);
     }
 
     public double maxLeftSpeed = 0;
@@ -33,15 +33,14 @@ public class DriveCallibrationUtility {
 
     private double wheelbaseSum;
     private int wheelbaseCount;
-    private FeedForwardPowerMultiplierSet wrapper;
+    private FeedForwardPowerMultiplierSet ffpmSet;
 
-    private DriveCallibrationUtility(Gyro gyro, FeedForwardPowerMultiplierSet wrapper) {
+    private DriveCalibrationUtility(Gyro gyro) {
         maxLeftSpeed = 0;
         maxRightSpeed = 0;
 
         calculatedWheelbase = new Wheelbase();
         this.gyro = gyro;
-        this.wrapper = wrapper;
 
         drive = SRXTankDrive.getInstance();
         calculatedWheelbase = new Wheelbase();
@@ -91,20 +90,14 @@ public class DriveCallibrationUtility {
 
             int duration = (int) data[2];
 
-            drive.new CmdGetFeedForwardPowerMultiplier(wrapper, gyro,pL,pR,duration).start();
+            ffpmSet = new FeedForwardPowerMultiplierSet();
+            drive.new CmdGetFeedForwardPowerMultiplier(ffpmSet,gyro,pL,pR,duration).start();
         });
 
         NarwhalDashboard.addButton("printCSV", (boolean down) -> {
             if (down) {
-                Log.info("ffps_avg", String.valueOf(wrapper.getAvgCSV()));
-			    Log.info("ffps", String.valueOf(wrapper.getAllCSV()));
-            }
-        });
-
-        NarwhalDashboard.addButton("remLast", (boolean down) -> {
-            if (down) {
-                wrapper.removeLastAverage();
-                wrapper.removeLastAll();
+                Log.info("DriveCalibrationUtility", "average:\n" + ffpmSet.getAvgCSV());
+			    Log.info("DriveCalibrationUtility", "data:\n" + ffpmSet.getAllCSV());
             }
         });
         
@@ -113,6 +106,32 @@ public class DriveCallibrationUtility {
                 new Cmd100InchDrive().start();
             }
         });
+
+        NarwhalDashboard.addNumDataListener("drivePID", (double constants[]) -> {
+			//this.leftMotionProfilePID.kF = constants[0];
+			drive.leftMotionProfilePID.kP = constants[0];
+			drive.leftMotionProfilePID.kI = constants[1];
+			drive.leftMotionProfilePID.kD = constants[2];
+
+			//this.rightMotionProfilePID.kF = constants[0];
+			drive.rightMotionProfilePID.kP = constants[3];
+			drive.rightMotionProfilePID.kI = constants[4];
+			drive.rightMotionProfilePID.kD = constants[5];
+
+			// this.leftVelocityPID.kF = constants[0];
+			// this.leftVelocityPID.kP = constants[4];
+			// this.leftVelocityPID.kI = constants[5];
+			// this.leftVelocityPID.kD = constants[6];
+
+			// this.rightVelocityPID.kF = constants[0];
+			// this.rightVelocityPID.kP = constants[4];
+			// this.rightVelocityPID.kI = constants[5];
+			// this.rightVelocityPID.kD = constants[6];
+
+            drive.setPID();
+            sendPIDConstants();
+        });
+        sendPIDConstants();
     }
 
     public void tickNarwhalDashboard() {
@@ -130,7 +149,9 @@ public class DriveCallibrationUtility {
         NarwhalDashboard.put("prev_wb", calculatedWheelbase.wheelbase / Length.in);
         NarwhalDashboard.put("avg_wb", wheelbaseSum / (wheelbaseCount * Length.in));
 
-
+        NarwhalDashboard.put("avg_w", ffpmSet.ffpmAvg.angularVelocity);
+        NarwhalDashboard.put("avg_ffpmL", ffpmSet.ffpmAvg.ffpL);
+        NarwhalDashboard.put("avg_ffpmR", ffpmSet.ffpmAvg.ffpR);
     }
 
     public double getWheelCirc() {
@@ -178,4 +199,30 @@ public class DriveCallibrationUtility {
             return 1.0;
         }
     }
+
+	/**
+	 * Sends PID constants to NarwhalDashboard
+	 */
+	public void sendPIDConstants() {
+		// NarwhalDashboard.put("l_f", leftMotionProfilePID.kF);
+
+		NarwhalDashboard.put("l_mp_p", drive.leftMotionProfilePID.kP);
+		NarwhalDashboard.put("l_mp_i", drive.leftMotionProfilePID.kI);
+		NarwhalDashboard.put("l_mp_d", drive.leftMotionProfilePID.kD);
+
+		// NarwhalDashboard.put("l_v_p", leftVelocityPID.kP);
+		// NarwhalDashboard.put("l_v_i", leftVelocityPID.kI);
+		// NarwhalDashboard.put("l_v_d", leftVelocityPID.kD);
+
+
+		// NarwhalDashboard.put("r_f", rightMotionProfilePID.kF);
+
+		NarwhalDashboard.put("r_mp_p", drive.rightMotionProfilePID.kP);
+		NarwhalDashboard.put("r_mp_i", drive.rightMotionProfilePID.kI);
+		NarwhalDashboard.put("r_mp_d", drive.rightMotionProfilePID.kD);
+
+		// NarwhalDashboard.put("r_v_p", leftVelocityPID.kP);
+		// NarwhalDashboard.put("r_v_i", leftVelocityPID.kI);
+		// NarwhalDashboard.put("r_v_d", leftVelocityPID.kD);
+	}
 }
