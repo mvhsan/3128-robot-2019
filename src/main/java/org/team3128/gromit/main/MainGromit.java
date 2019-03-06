@@ -1,6 +1,8 @@
 package org.team3128.gromit.main;
 
+import org.team3128.gromit.util.*;
 import org.team3128.common.NarwhalRobot;
+import org.team3128.common.drive.DriveCommandRunning;
 import org.team3128.common.drive.SRXInvertCallback;
 import org.team3128.common.drive.SRXTankDrive;
 import org.team3128.common.drive.calibrationutility.DriveCalibrationUtility;
@@ -17,9 +19,12 @@ import org.team3128.common.listener.controltypes.POV;
 import org.team3128.common.narwhaldashboard.NarwhalDashboard;
 import org.team3128.common.util.Constants;
 import org.team3128.common.util.Log;
+import org.team3128.common.util.datatypes.PIDConstants;
 import org.team3128.common.util.enums.Direction;
 import org.team3128.common.util.units.Angle;
 import org.team3128.common.util.units.Length;
+import org.team3128.common.vision.CmdAutoAim;
+import org.team3128.gromit.autonomous.CmdAutoPrime;
 import org.team3128.gromit.autonomous.CmdTestDriveTrain;
 import org.team3128.gromit.cvcommands.CmdBadHARC;
 import org.team3128.gromit.mechanisms.Climber;
@@ -116,13 +121,17 @@ public class MainGromit extends NarwhalRobot{
 	public Piston climbPiston;
 	public TalonSRX climbMotor;
 
-	
+	// Vision
+	public PIDConstants offsetPID;
+    private DriveCommandRunning driveCmdRunning;
 
 	// Controls
 	public Joystick leftJoystick;
 	public Joystick rightJoystick;
 	public ListenerManager listenerLeft;
 	public ListenerManager listenerRight;
+
+	public CmdAutoPrime alignCommand;
 
 	// Miscellaneous
 	public PowerDistributionPanel powerDistPanel;
@@ -182,6 +191,7 @@ public class MainGromit extends NarwhalRobot{
 
     @Override
     protected void constructHardware() {
+
 		// Construct and Configure Drivetrain
 		leftDriveLeader = new TalonSRX(15);
 		leftDriveFollower = new VictorSPX(16);
@@ -212,8 +222,13 @@ public class MainGromit extends NarwhalRobot{
 		// gyro = new AnalogDevicesGyro();
 		// ((AnalogDevicesGyro) gyro).recalibrate();
 
-		// DCU
-		//DriveCalibrationUtility.initialize(gyro);
+		
+        // Vision
+        offsetPID = new PIDConstants(0, 0.02, 0.0, 0.00001);
+        driveCmdRunning = new DriveCommandRunning();
+
+        // DCU
+		//DriveCalibrationUtility.initialize(gyro, offsetPID);
 		//dcu = DriveCalibrationUtility.getInstance();
 
 		compressor = new Compressor();
@@ -419,7 +434,8 @@ public class MainGromit extends NarwhalRobot{
 		{
 			if (!runningCommand) {
 				double vert =     -1.0 * listenerRight.getAxis("MoveForwards");
-				double horiz =    -0.8 * listenerRight.getAxis("MoveTurn");
+				//DEBUG: IF ANYTHING GOES WRONG, CHANGE TO -0.8 (ADHAM AND JUDE REMEMBER)
+				double horiz =    0.8 * listenerRight.getAxis("MoveTurn");
 				double throttle = -1.0 * listenerRight.getAxis("Throttle");
 	
 				drive.arcadeDrive(vert, horiz, throttle, true);
@@ -469,13 +485,15 @@ public class MainGromit extends NarwhalRobot{
 
 
 		// Optimus Prime Controls
-		listenerRight.nameControl(ControllerExtreme3D.TRIGGER, "SetHeight");
-		listenerRight.addButtonDownListener("SetHeight", () -> {
-			optimusPrime.setState(RobotState.getOptimusState(currentGameElement, currentScoreTarget));
-		});
-		listenerRight.addButtonUpListener("SetHeight", () -> {
-			optimusPrime.setState(RobotState.REST);
-		});
+		listenerRight.nameControl(ControllerExtreme3D.TRIGGER, "AutoPrime");
+		listenerRight.addButtonDownListener("AutoPrime", () -> {
+            alignCommand = new CmdAutoPrime(gyro, limelight, driveCmdRunning, offsetPID);
+            alignCommand.start();
+        });
+        listenerRight.addButtonUpListener("AutoPrime", () -> {
+            alignCommand.cancel();
+            alignCommand = null;
+        });
 
 		listenerRight.nameControl(new Button(6), "RestState");
 		listenerRight.addButtonDownListener("RestState" , () -> {
@@ -483,12 +501,12 @@ public class MainGromit extends NarwhalRobot{
 		});
 
 		// Game Element Controls
-		listenerRight.nameControl(new Button(4), "SelectHatchPanel");
+		listenerRight.nameControl(new Button(12), "SelectHatchPanel");
 		listenerRight.addButtonDownListener("SelectHatchPanel", () -> {
 			currentGameElement = GameElement.HATCH_PANEL;
 		});
 
-		listenerRight.nameControl(new Button(3), "SelectCargo");
+		listenerRight.nameControl(new Button(10), "SelectCargo");
 		listenerRight.addButtonDownListener("SelectCargo", () -> {
 			currentGameElement = GameElement.CARGO;
 		});
@@ -515,19 +533,16 @@ public class MainGromit extends NarwhalRobot{
 			currentScoreTarget = ScoreTarget.ROCKET_LOW;
 		});
 
-		// Compressor
-		listenerRight.nameControl(new Button(10), "StartCompressor");
-		listenerRight.addButtonDownListener("StartCompressor", () ->
+		listenerRight.nameControl(new Button(3), "SetHeight");
+		listenerRight.addButtonDownListener("SetHeight", () ->
 		{
-			compressor.start();
-			Log.info("MainGuido", "Starting Compressor");
+			optimusPrime.setState(RobotState.getOptimusState(currentGameElement, currentScoreTarget));
 		});
 
-		listenerRight.nameControl(new Button(12), "StopCompressor");
-		listenerRight.addButtonDownListener("StopCompressor", () ->
+		listenerRight.nameControl(new Button(4), "Zero");
+		listenerRight.addButtonDownListener("Zero", () ->
 		{
-			compressor.stop();
-			Log.info("MainGuido", "Stopping Compressor");
+			optimusPrime.setState(RobotState.ZERO);
 		});
 
 		// MANUAL CONTROLS AND OVERRIDES
@@ -687,6 +702,6 @@ public class MainGromit extends NarwhalRobot{
 
 		NarwhalDashboard.put("gear", drive.isInHighGear());
 
-		dcu.tickNarwhalDashboard();
+		//dcu.tickNarwhalDashboard();
 	}
 }
