@@ -25,23 +25,25 @@ public class Lift
 	public enum LiftHeightState {
 		//INIT_BASE(-15 * Length.in),
 		//STARTING(18 * Length.in),
-		
+
 		BASE(0 * Length.in),
+		ALT_INTAKE_LOW_HATCH(18.75 * Length.in),
 		
 		//6.3
-		INTAKE_FLOOR_CARGO(5 * Length.in),
+		INTAKE_FLOOR_CARGO(4.5 * Length.in),
 		VISION(53*Length.in),
 
 		LOW_CARGO(42 * Length.in),
-		MID_CARGO(77 * Length.in),
+		MID_CARGO(51 * Length.in),
 		TOP_CARGO(78 * Length.in),
 		
         LOW_HATCH(18.5 * Length.in),
         MID_HATCH(53 * Length.in),
-		TOP_HATCH(59 * Length.in),
+		TOP_HATCH(63 * Length.in),
 		
-        LOADING_SHIP_CARGO(57.5 * Length.in),
-        LOADING_SHIP_HATCH(16.5 * Length.in);
+		//57.5
+        LOADING_SHIP_CARGO(40 * Length.in);
+        //LOADING_SHIP_HATCH(16.5 * Length.in);
 
 		public double targetHeight;
 
