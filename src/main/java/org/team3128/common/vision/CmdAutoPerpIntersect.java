@@ -3,6 +3,7 @@ package org.team3128.common.vision;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 
 import org.team3128.common.drive.DriveCommandRunning;
+import org.team3128.gromit.util.DeepSpaceConstants;
 import org.team3128.common.drive.SRXTankDrive;
 import org.team3128.common.hardware.limelight.Limelight;
 import org.team3128.common.hardware.navigation.Gyro;
@@ -15,7 +16,7 @@ import org.team3128.common.util.units.Length;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.command.Command;
 
-public class CmdAutoAim extends Command {
+public class CmdAutoPerpIntersect extends Command {
     SRXTankDrive drive;
     Gyro gyro;
 
@@ -61,7 +62,7 @@ public class CmdAutoAim extends Command {
 
     private AutoAimState aimState = AutoAimState.SEARCHING;
 
-    public CmdAutoAim(Gyro gyro, Limelight limelight, PIDConstants visionPID, DriveCommandRunning cmdRunning,
+    public CmdAutoPerpIntersect(Gyro gyro, Limelight limelight, PIDConstants visionPID, DriveCommandRunning cmdRunning,
             double goalHorizontalOffset, double targetHeight, double decelerationStartDistance, double decelerationEndDistance,
             PIDConstants blindPID, boolean visionStating) {
         this.gyro = gyro;
@@ -83,6 +84,13 @@ public class CmdAutoAim extends Command {
 
     @Override
     protected void initialize() {
+        if(limelight.getValue("x", 5) <= DeepSpaceConstants.VISION_TX_ALIGN_THRESHOLD){
+            goalHorizontalOffset = 0;
+        } else {
+            double tempX = limelight.getValue("x", 5);
+            double tempY = limelight.getValue("y", 5);
+            goalHorizontalOffset = RobotMath.atan((DeepSpaceConstants.VISION_TARGET_POINT + tempX)/tempY) - RobotMath.atan(tempX/tempY);
+        }
         drive = SRXTankDrive.getInstance();
 
         limelight.turnOnLED();
@@ -136,6 +144,9 @@ public class CmdAutoAim extends Command {
                     }
                 }
                 else {
+                    if(limelight.getValue("x", 5) <= DeepSpaceConstants.VISION_TX_ALIGN_THRESHOLD){
+                        goalHorizontalOffset = 0;
+                    }
                     currentHorizontalOffset = limelight.getValue("tx", 5);
 
                     currentTime = RobotController.getFPGATime();

@@ -4,7 +4,6 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
-import org.team3128.common.util.Log;
 import org.team3128.common.util.RobotMath;
 
 /**
@@ -16,18 +15,25 @@ public class Limelight
 {    
     public double cameraAngle;
     public double cameraHeight;
-    public double targetHeight;
+    //public double targetHeight;
     public double targetWidth;
     public double centerDist;
 
     public NetworkTable limelightTable, calcValsTable;
     public NetworkTableEntry nd, nd0, nd1, ntheta, ntheta0, ntheta1, ndeltax, ndeltay, camtran;
     
-    public Limelight(double centerDist, double cameraAngle, double cameraHeight, double targetHeight, double targetWidth) {
+    /**
+     * 
+     * @param centerDist - The vertical distance between the center of the robot's wheelbase and the camera
+     * @param cameraAngle - The vertical angle of the limelight
+     * @param cameraHeight - The height off of the ground of the limelight
+     * @param targetWidth - The width of the target
+     */
+    public Limelight(double centerDist, double cameraAngle, double cameraHeight, double targetWidth) {
         this.centerDist = centerDist;
         this.cameraAngle = cameraAngle;
         this.cameraHeight = cameraHeight;
-        this.targetHeight = targetHeight;
+        //this.targetHeight = targetHeight;
         this.targetWidth = targetWidth;
 
         limelightTable = NetworkTableInstance.getDefault().getTable("limelight");
@@ -90,8 +96,18 @@ public class Limelight
         
         return data;
     }
+
+    public double getApproximateDistance(double targetHeight, int n) {
+        if (!hasValidTarget()) return -1;
+
+        return calculateDistanceFromTY(getValue("ty", n), targetHeight);
+    }
+
+    public double calculateDistanceFromTY(double ty, double targetHeight) {
+        return  (targetHeight - cameraHeight) / RobotMath.tan(ty + cameraAngle);
+    }
     
-    public CalculatedData doMath(LimelightData inputData) {
+    public CalculatedData doMath(LimelightData inputData, double targetHeight) {
         CalculatedData outputData = new CalculatedData();
         double targetArcAngle = inputData.boxWidth() * LimelightConstants.horizFOV/LimelightConstants.screenWidth;
 

@@ -12,9 +12,9 @@ import org.team3128.common.drive.DriveCommandRunning;
 import org.team3128.common.drive.SRXTankDrive;
 import org.team3128.common.vision.CmdAutoAim;
 import org.team3128.gromit.cvcommands.CmdAutOptimusPrime;
-import org.team3128.gromit.main.MainGromit;
-import org.team3128.gromit.main.MainGromit.GameElement;
-import org.team3128.gromit.main.MainGromit.ScoreTarget;
+import org.team3128.gromit.main.MainDeepSpaceRobot;
+import org.team3128.gromit.main.MainDeepSpaceRobot.GameElement;
+import org.team3128.gromit.main.MainDeepSpaceRobot.ScoreTarget;
 import org.team3128.gromit.mechanisms.OptimusPrime;
 import org.team3128.gromit.mechanisms.OptimusPrime.RobotState;
 import org.team3128.gromit.util.DeepSpaceConstants;
@@ -25,10 +25,15 @@ import org.team3128.common.hardware.navigation.Gyro;
 
 public class CmdAutoPrime extends CommandGroup {
 
-    public CmdAutoPrime(Gyro gyro, Limelight limelight, DriveCommandRunning cmdRunning, PIDConstants offsetPID, GameElement gameElement, ScoreTarget scoreTarget) {
-    addSequential(new CmdRunInParallel(
-            new CmdAutoAim(gyro, limelight, offsetPID, cmdRunning, DeepSpaceConstants.LOWER_TY_DECELERATE_THRESHOLD, 20.0 * Angle.DEGREES),
-            new CmdAutOptimusPrime(limelight, gameElement, scoreTarget)
+    public CmdAutoPrime(Gyro gyro, Limelight limelight, DriveCommandRunning cmdRunning, PIDConstants visionPID, PIDConstants blindPID, GameElement gameElement, ScoreTarget scoreTarget, boolean intakingHatchPanel) {
+        double targetHeight = DeepSpaceConstants.getVisionTargetHeight(gameElement, scoreTarget);
+        boolean visionStating = !intakingHatchPanel && gameElement == GameElement.HATCH_PANEL && (scoreTarget == ScoreTarget.CARGO_SHIP || scoreTarget == ScoreTarget.ROCKET_LOW);
+        
+        addSequential(new CmdRunInParallel(
+            new CmdAutoAim(gyro, limelight, visionPID, cmdRunning,
+                -1 * Angle.DEGREES, targetHeight, DeepSpaceConstants.DECELERATE_START_DISTANCE, DeepSpaceConstants.DECELERATE_END_DISTANCE,
+                blindPID, visionStating),
+            new CmdAutOptimusPrime(limelight, gameElement, scoreTarget, intakingHatchPanel)
         ));
     }
 }

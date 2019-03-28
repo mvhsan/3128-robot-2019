@@ -4,8 +4,6 @@ import org.team3128.common.util.Constants;
 import org.team3128.common.util.Log;
 import org.team3128.common.util.RobotMath;
 import org.team3128.common.util.units.Angle;
-import org.team3128.common.hardware.navigation.Gyro;
-import org.team3128.common.hardware.navigation.NavX;
 
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.can.TalonSRX;
@@ -18,19 +16,19 @@ public class FourBar
 	/**
 	 * The angle in native units equal to 1 degree.
 	 */
-    public final double ratio = 4550 / (180 * Angle.DEGREES);
-	public double error;
+    public double ratio, error;
 
-	public Gyro gyro = new NavX();
 	private final double allowableError = 2 * Angle.DEGREES;
 
     public enum FourBarState {
-		ZERO(90*Angle.DEGREES), //DEBUG
+		VERTICAL(90*Angle.DEGREES), //DEBUG
 		SHIP_AND_LOADING(-55 * Angle.DEGREES),
 		// HATCH_DROP_SHIP_LOADING(-53 * Angle.DEGREES),
 
-		ROCKET_LOW(-67 * Angle.DEGREES), 
-		CARGO_MID(64 * Angle.DEGREES),
+		CARGO_LOW(80 * Angle.DEGREES), 
+		//64
+		CARGO_MID(80 * Angle.DEGREES),
+		CARGO_LOADING_STATION(55 * Angle.DEGREES),
 		// HATCH_DROP_ROCKET_LOW(-65 * Angle.DEGREES),
 		
 		CARGO_INTAKE(-22 * Angle.DEGREES),
@@ -39,19 +37,19 @@ public class FourBar
 		HATCH_LOW(-60 * Angle.DEGREES),
 		//64
 		HATCH_HIGH(54 * Angle.DEGREES),
-		CARGO_HIGH(76 * Angle.DEGREES);
+		CARGO_HIGH(82 * Angle.DEGREES);
 		//68
 		public double targetAngle;
 
-        private FourBarState(double angle){
+        private FourBarState(double angle) {
             this.targetAngle = angle;
 		}
 	}
 	
 	public enum FourBarControlMode {
 		PERCENT(1, "Percent Output"),
-		POSITION(1, "Position");
-		// BRAKE(0, "Brake");
+		POSITION(1, "Position"),
+		ZEROING(1, "Zeroing");
 
 		private int pidSlot;
 		private String name;
@@ -94,10 +92,12 @@ public class FourBar
 	int maxVelocity;
 
 	// Control Thread Variables
-	public double peakBrakePower = 0.15;
-	private double brakeTrigFudge = 0.095;
+	public double PEAK_BRAKE_POWER = 0.15;
+	public double BRAKE_TRIG_FUDGE = 0.095;
 
-	public double maxAngle = +90.0 * Angle.DEGREES;
+	public double ZEROING_VELOCITY = 30 * Angle.DEGREES * ratio / 10.0;
+
+	public double maxAngle = +95.0 * Angle.DEGREES;
 	public double minAngle = -90.0 * Angle.DEGREES;
 
 	public boolean disabled = false;
@@ -125,15 +125,18 @@ public class FourBar
 		return null;
 	}
 
-	public static void initialize(TalonSRX fourBarMotor, FourBarState state, DigitalInput limitSwitch, double limitSwitchAngle, int maxVelocity) {
-		instance = new FourBar(fourBarMotor, state, limitSwitch, limitSwitchAngle, maxVelocity);
+	public static void initialize(TalonSRX fourBarMotor, FourBarState state, DigitalInput limitSwitch, double ratio, double limitSwitchAngle, int maxVelocity) {
+		instance = new FourBar(fourBarMotor, state, limitSwitch, ratio, limitSwitchAngle, maxVelocity);
 	}
 
-	private FourBar(TalonSRX fourBarMotor, FourBarState state, DigitalInput limitSwitch, double limitSwitchAngle, int maxVelocity) {
+	private FourBar(TalonSRX fourBarMotor, FourBarState state, DigitalInput limitSwitch, double ratio, double limitSwitchAngle, int maxVelocity) {
 		this.fourBarMotor = fourBarMotor;
 		this.state = state;
 
 		this.limitSwitch = limitSwitch;
+
+		this.ratio = ratio;
+
 		this.limitSwitchAngle = limitSwitchAngle;
 		this.maxVelocity = maxVelocity;
 
@@ -141,45 +144,66 @@ public class FourBar
 				
 		fourBarThread = new Thread(() ->
 		{
-			double target = 0;
+			int zeroVelocityCount = 0;
 
-			double setPoint = 0;
+			double currentTarget = 0;
+			double previousTarget = 0;
 
 			double kP;
 			double kD;
 
 			while (true)
 			{
-				if (this.getLimitSwitch())
-				{
-					this.setCurrentAngle(limitSwitchAngle);
+				// Zeroing Logic
+				if (this.controlMode == FourBarControlMode.ZEROING) {
+					if (Math.abs(fourBarMotor.getSelectedSensorVelocity()) < 5) {
+						zeroVelocityCount += 1;
+					}
+					else {
+						zeroVelocityCount = 0;
+					}
+
+					if (zeroVelocityCount > 30 || this.getLimitSwitch() /** || maybe cleverly implement current limiting*/) {
+						this.state = FourBarState.VERTICAL;
+						Log.info("FourBar", "Zeroing sequence hit hard/soft stop. Braking now...");
+
+						this.angleControl(85.0 * Angle.DEGREES);
+
+						zeroVelocityCount = 0;
+					}
 				}
 
-				if (this.disabled)
-				{
+				// Limit switch setting
+				if (this.getLimitSwitch()) {
+					this.setCurrentAngle(this.limitSwitchAngle);
+
+					this.state = FourBarState.VERTICAL;
+				}
+
+				// Control loop logic
+				if (this.disabled) {
 					this.fourBarMotor.set(ControlMode.PercentOutput, 0);
 				}
 				else {
-					target = 0;
+					currentTarget = 0;
 
 					if (this.controlMode == FourBarControlMode.PERCENT) {
 						if (this.override) {
-							target = desiredTarget;
-							this.fourBarMotor.set(ControlMode.PercentOutput, target);
+							currentTarget = desiredTarget;
+							this.fourBarMotor.set(ControlMode.PercentOutput, currentTarget);
 						}
 						else {
 							this.canRaise = this.getCurrentAngle() < this.maxAngle - 2 * Angle.DEGREES;
 							this.canLower = this.getCurrentAngle() > this.minAngle + 1 * Angle.DEGREES;
 
 							if (desiredTarget > 0 && this.canRaise) {
-								target = 0.7 * getAdjustedTarget(desiredTarget);
+								currentTarget = 0.7 * getAdjustedTarget(desiredTarget);
 							}
 							else if (desiredTarget < 0 && this.canLower) {
-								target = 0.4 * getAdjustedTarget(desiredTarget);
+								currentTarget = 0.4 * getAdjustedTarget(desiredTarget);
 							}
 
-							if ((Math.abs(target) < 0.0001 && this.canRaise && this.canLower)) {
-								//this.brakeControl();
+							if ((Math.abs(currentTarget) < 0.0001 && this.canRaise && this.canLower)) {
 								this.brake();
 							}
 						}
@@ -188,26 +212,32 @@ public class FourBar
 						lastError = this.error;
 						this.error = desiredTarget - this.getCurrentAngle();
 
-						// if (Math.abs(this.error) < 0.2) {
-						// 	this.brakeControl();
-						// }
-
 						if (this.error > 0) {
-							kP = 0.285;
+							kP = 0.23;
 						}
 						else {
 							kP = 0.01;
 						}
+						kD = 0;
 
-						kD = 0*0.05;
-						target = /*gyro.getPitch() +*/ this.getFeedForwardPower() + kP * this.error + kD * (this.error - lastError) * 1000000 / (RobotController.getFPGATime() - this.lastTime);
+						currentTarget = this.getFeedForwardPower() + kP * this.error + kD * (this.error - lastError) * 1000000 / (RobotController.getFPGATime() - this.lastTime);
+						this.lastTime = RobotController.getFPGATime();
+					}
+					else if (this.controlMode == FourBarControlMode.ZEROING) {
+						lastError = this.error;
+						this.error = desiredTarget - fourBarMotor.getSelectedSensorVelocity();
+
+						kP = 0.3;
+						kD = 0;
+
+						currentTarget = 0.7 /** + kP * this.error + kD * (this.error - lastError) * 1000000 / (RobotController.getFPGATime() - this.lastTime) */;
 						this.lastTime = RobotController.getFPGATime();
 					}
 
-					if (Math.abs(target - setPoint) > 0.0001) {
-						this.fourBarMotor.set(ControlMode.PercentOutput, target);
+					if (Math.abs(currentTarget - previousTarget) > 0.0001) {
+						this.fourBarMotor.set(ControlMode.PercentOutput, currentTarget);
 
-						setPoint = target;
+						previousTarget = currentTarget;
 					}
 				}
 
@@ -237,6 +267,7 @@ public class FourBar
 	}
 
 	public void setCurrentAngle(double angle) {
+		//Log.info("FourBar", "Setting current angle to " + angle + " degrees.");
 		fourBarMotor.setSelectedSensorPosition((int) (angle * ratio), 0, Constants.CAN_TIMEOUT);
 	}
 
@@ -249,7 +280,7 @@ public class FourBar
 	}
 	
 	private double getFeedForwardPower() {
-		return peakBrakePower * (brakeTrigFudge + (1 - brakeTrigFudge)*RobotMath.cos(getCurrentAngle()));
+		return PEAK_BRAKE_POWER * (BRAKE_TRIG_FUDGE + (1 - BRAKE_TRIG_FUDGE)*RobotMath.cos(getCurrentAngle()));
 	}
     
 	public void powerControl(double joystick)
@@ -259,15 +290,17 @@ public class FourBar
 		desiredTarget = joystick;
 	}
 
-	// public void brakeControl(){
-	// 	if (controlMode != FourBarControlMode.BRAKE) {
-	// 		fourBarMotor.set(ControlMode.Position, (int) (getCurrentAngle() * ratio));
-	// 	}
-	// 	setControlMode(FourBarControlMode.BRAKE);
-	// }
-
 	public void brake() {
 		angleControl(this.getCurrentAngle());
+	}
+
+	public void zero() {
+		setControlMode(FourBarControlMode.ZEROING);
+
+		desiredTarget = ZEROING_VELOCITY;
+
+		lastTime = RobotController.getFPGATime();
+		lastError = desiredTarget - fourBarMotor.getSelectedSensorVelocity();
 	}
 
 	public void angleControl(double angle) {
@@ -275,7 +308,7 @@ public class FourBar
 
 		desiredTarget = angle;
 
-		lastTime = 0;
+		lastTime = RobotController.getFPGATime();
 		lastError = desiredTarget - this.getCurrentAngle();
 	}
 
@@ -291,25 +324,23 @@ public class FourBar
 
 		@Override
 		protected void initialize() {
-			override = true;
-			powerControl(0.2);
+			zero();
 		}
 
 		@Override
 		protected boolean isFinished()
 		{
-			return getLimitSwitch() || isTimedOut();
+			return controlMode != FourBarControlMode.ZEROING || isTimedOut();
 		}
 
 		@Override
 		protected void end() {
-			override = false;
-			setCurrentAngle(limitSwitchAngle);
+			Log.info("CmdZero", "Four Bar zeroed.");
 		}
 
 		@Override
 		protected void interrupted() {
-			end();
+			Log.info("CmdZero", "Four Bar zeroing interrupted.");
 		}
 	}
 
