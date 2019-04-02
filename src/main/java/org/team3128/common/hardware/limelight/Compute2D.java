@@ -5,7 +5,9 @@ import org.team3128.common.util.units.Length;
 
 public class Compute2D {
     public static class Compute2DLocalization {
-        public double x, y, xPrime, yPrime, yaw;
+        public double x, y, alpha, yaw;
+
+        public double xPrime, yPrime;
     
         public double thetaLeft, thetaRight;
         public double distance, distanceLeft, distanceRight;
@@ -15,6 +17,7 @@ public class Compute2D {
                 "(x, y) = " + (x/Length.in) + "in, " + (y/Length.in) + "in\n" +
                 "(x', y') = " + (xPrime/Length.in) + "in, " + (yPrime/Length.in) + "in\n" +
                 "\n" +
+                "alpha = " + alpha + "\n" + 
                 "yaw = " + yaw + "\n" +
                 "(theta_left, theta_right) = " + thetaLeft + "," + thetaRight + "\n" +
                 "\n" +
@@ -39,6 +42,32 @@ public class Compute2D {
     }
 
     public static Compute2DLocalization compute2D(Limelight limelight, Compute2DInput inputData, double targetHeight) {
+        Compute2DLocalization outputData = new Compute2DLocalization();
+
+        double targetHorizontalArcAngle = inputData.boundingBoxPixelWidth * LimelightConstants.HORIZONTAL_FOV/LimelightConstants.SCREEN_WIDTH;
+
+        outputData.yPrime = limelight.calculateYPrimeFromTY(inputData.verticalOffsetAngle, targetHeight);
+        outputData.xPrime = outputData.yPrime * RobotMath.tan(inputData.horizontalOffsetAngle);
+
+        outputData.distance = outputData.yPrime / RobotMath.cos(inputData.horizontalOffsetAngle);
+
+        double tanBover2 = RobotMath.tan(targetHorizontalArcAngle / 2);
+        double alpha = RobotMath.atan(Math.sqrt(
+            (2*RobotMath.square(outputData.distance) - 2*outputData.distance*Math.sqrt(RobotMath.square(tanBover2 * limelight.targetWidth) + RobotMath.square(outputData.distance) + RobotMath.square(limelight.targetWidth)) + RobotMath.square(limelight.targetWidth))
+            /
+            (RobotMath.square(tanBover2 * limelight.targetWidth))
+        ));
+
+        outputData.alpha = alpha;
+
+        outputData.y = outputData.distance * RobotMath.cos(alpha);
+        outputData.x = outputData.y * RobotMath.tan(alpha - targetHorizontalArcAngle/2) + limelight.targetWidth/2;
+        
+        return outputData;
+    }
+
+
+    public static Compute2DLocalization deadCompute2D(Limelight limelight, Compute2DInput inputData, double targetHeight) {
         Compute2DLocalization outputData = new Compute2DLocalization();
         
         double targetHorizontalArcAngle = inputData.boundingBoxPixelWidth * LimelightConstants.HORIZONTAL_FOV/LimelightConstants.SCREEN_WIDTH;
