@@ -26,20 +26,21 @@ public class Lift
 		ZEROING(-3 * Length.in),
 		BASE(0 * Length.in),
 		
-		INTAKE_FLOOR_CARGO(6.5 * Length.in),
-		VISION(35*Length.in),
+		INTAKE_FLOOR_CARGO(8 * Length.in),
+		VISION(35 * Length.in),
 
-		LOW_CARGO(14.75 * Length.in),
-		MID_CARGO(50 * Length.in),
+		SHIP_CARGO(30 * Length.in),
+
+		LOW_CARGO(12 * Length.in),
+		MID_CARGO(46 * Length.in),
 		TOP_CARGO(80 * Length.in),
+
+		HATCH_INTAKE(24 * Length.in),
 		
-        LOW_HATCH(21 * Length.in),
-        MID_HATCH(30.5 * Length.in),
-		TOP_HATCH(64 * Length.in),
-		
-		//57.5
-        LOADING_SHIP_CARGO(30 * Length.in),
-		LOADING_SHIP_HATCH(21 * Length.in);
+        LOW_HATCH(25.5 * Length.in),
+        MID_HATCH(33.5 * Length.in),
+		TOP_HATCH(67.5 * Length.in);
+
 		public double targetHeight;
 
 		private LiftHeightState(double height)
